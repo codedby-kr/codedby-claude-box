@@ -1,0 +1,15 @@
+{
+  "description": "Session start hook — injects session ID and existing memory keywords into AI context",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

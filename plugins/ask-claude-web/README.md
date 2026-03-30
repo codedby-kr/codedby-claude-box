@@ -133,8 +133,8 @@ Launch Chrome manually → navigate to `chrome://inspect/#remote-debugging` → 
 ### 2. Install the Plugin
 
 ```bash
-/plugin marketplace add codedby-kr/codedby-claude-plugins
-/plugin install ask-claude-web@codedby-claude-plugins
+/plugin marketplace add codedby-kr/codedby-claude-box
+/plugin install ask-claude-web@codedby-claude-box
 ```
 
 ### 3. Install chrome-devtools MCP
@@ -181,9 +181,9 @@ After it finishes, type `/reload-plugins` or restart Claude Code to apply.
 <summary>Manual update</summary>
 
 ```bash
-git -C ~/.claude/plugins/marketplaces/codedby-claude-plugins pull origin main
-rm -rf ~/.claude/plugins/cache/codedby-claude-plugins/ask-claude-web/
-claude plugin update ask-claude-web@codedby-claude-plugins -s user
+git -C ~/.claude/plugins/marketplaces/codedby-claude-box pull origin main
+rm -rf ~/.claude/plugins/cache/codedby-claude-box/ask-claude-web/
+claude plugin update ask-claude-web@codedby-claude-box -s user
 ```
 
 Then type `/reload-plugins` or restart Claude Code.

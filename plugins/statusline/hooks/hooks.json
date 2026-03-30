@@ -1,0 +1,15 @@
+{
+  "description": "Context usage notification hook — injects context window utilization into AI",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/context-notify.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

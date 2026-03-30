@@ -1,13 +1,13 @@
 ---
-description: Update ask-claude-web plugin to the latest version
+description: Update guard-claude-dir plugin to the latest version
 allowed-tools: Bash(git:*), Bash(rm:*), Bash(claude plugin:*)
 ---
 
 Run these commands in order:
 
 1. `git -C ~/.claude/plugins/marketplaces/codedby-claude-box pull origin main`
-2. `rm -rf ~/.claude/plugins/cache/codedby-claude-box/ask-claude-web/`
-3. `claude plugin update ask-claude-web@codedby-claude-box -s user`
+2. `rm -rf ~/.claude/plugins/cache/codedby-claude-box/guard-claude-dir/`
+3. `claude plugin update guard-claude-dir@codedby-claude-box -s user`
 
 > PowerShell users: replace `~` with `$HOME` in the commands above.
 

@@ -1,0 +1,15 @@
+{
+  "description": "Pre-empts .claude/ permission dialogs and protects critical config files from deletion/moving",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-claude-dir.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

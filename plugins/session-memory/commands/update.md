@@ -1,13 +1,13 @@
 ---
-description: Update ask-claude-web plugin to the latest version
+description: Update session-memory plugin to the latest version
 allowed-tools: Bash(git:*), Bash(rm:*), Bash(claude plugin:*)
 ---
 
 Run these commands in order:
 
 1. `git -C ~/.claude/plugins/marketplaces/codedby-claude-box pull origin main`
-2. `rm -rf ~/.claude/plugins/cache/codedby-claude-box/ask-claude-web/`
-3. `claude plugin update ask-claude-web@codedby-claude-box -s user`
+2. `rm -rf ~/.claude/plugins/cache/codedby-claude-box/session-memory/`
+3. `claude plugin update session-memory@codedby-claude-box -s user`
 
 > PowerShell users: replace `~` with `$HOME` in the commands above.
 

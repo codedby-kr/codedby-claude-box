@@ -134,8 +134,8 @@ Chrome을 수동으로 실행 → `chrome://inspect/#remote-debugging` → **"Al
 ### 2. 플러그인 설치
 
 ```bash
-/plugin marketplace add codedby-kr/codedby-claude-plugins
-/plugin install ask-claude-web@codedby-claude-plugins
+/plugin marketplace add codedby-kr/codedby-claude-box
+/plugin install ask-claude-web@codedby-claude-box
 ```
 
 ### 3. chrome-devtools MCP 설치
@@ -182,9 +182,9 @@ MCP 연결 확인: `/mcp` → `chrome-devtools · ✔ connected`
 <summary>수동 업데이트</summary>
 
 ```bash
-git -C ~/.claude/plugins/marketplaces/codedby-claude-plugins pull origin main
-rm -rf ~/.claude/plugins/cache/codedby-claude-plugins/ask-claude-web/
-claude plugin update ask-claude-web@codedby-claude-plugins -s user
+git -C ~/.claude/plugins/marketplaces/codedby-claude-box pull origin main
+rm -rf ~/.claude/plugins/cache/codedby-claude-box/ask-claude-web/
+claude plugin update ask-claude-web@codedby-claude-box -s user
 ```
 
 완료 후 `/reload-plugins` 입력 또는 Claude Code를 재시작하세요.
@@ -209,6 +209,7 @@ claude plugin update ask-claude-web@codedby-claude-plugins -s user
 |--------|------|
 | `/ask-claude-web:execute-loop-doc` | 문서에 기술된 작업 계획을 항목별로 실행. 웹 클로드가 중간 관리자 역할 — 지시, 검토, 수정 요청. 단독 모드(자체 검증)도 지원. |
 | `/ask-claude-web:execute-loop-msg` | 동일한 반복 실행이지만 문서 대신 사용자 메시지에서 작업 계획을 구성. |
+| `/ask-claude-web:localize-ko` | 플러그인의 문서와 스크립트를 한국어로 전환. 영어 원본은 `.en.md`/`.en.mjs`로 백업. |
 
 ```
 /ask-claude-web:execute-loop-doc "계획문서/경로.md" 웹 클로드 검증
@@ -217,14 +218,15 @@ claude plugin update ask-claude-web@codedby-claude-plugins -s user
 
 ---
 
-## 한국어 스킬 파일
+## 한국어 전환
 
-스킬 파일(SKILL.md)은 Claude Code가 읽는 문서이므로 영문 버전을 그대로 사용해도 동작에 차이가 없습니다.
-한국어 버전은 직접 읽고 수정할 때 편하도록 제공합니다:
+스킬, 커맨드, README 등 모든 문서와 스크립트를 한국어로 전환할 수 있습니다:
 
-```bash
-cp skills/ask-claude-web/SKILL.ko.md skills/ask-claude-web/SKILL.md
 ```
+/ask-claude-web:localize-ko
+```
+
+영어 원본은 `.en.md`/`.en.mjs`로 자동 백업되며, 원본이 사라지지 않습니다.
 
 <details>
 <summary><strong>플랫폼 지원</strong></summary>
