@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.1
+
+- Add Korean localization (statusline.ko.mjs) with Korean comments and KST timestamps
+- Default lastActivity and cacheEfficiency to off (toggle in CONFIG)
+
 ## v1.0.0
 
 - Initial release

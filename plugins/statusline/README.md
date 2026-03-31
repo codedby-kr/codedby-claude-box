@@ -4,7 +4,7 @@
 
 Everything you need to know about your Claude Code session — in one line at the bottom of the screen.
 
-**Latest: v1.0.0** · [Changelog](./CHANGELOG.md)
+**Latest: v1.0.1** · [Changelog](./CHANGELOG.md)
 
 Most of Claude Code's session data is invisible. Rate limits, context usage, token costs, git state, active agents — you only find out when something breaks. This plugin renders all of it as a persistent status bar, updated on every prompt.
 

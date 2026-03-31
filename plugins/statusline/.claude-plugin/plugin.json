@@ -1,7 +1,7 @@
 {
   "name": "statusline",
   "description": "Rich status bar for Claude Code — rate limits, context usage, git info, task progress, and more in a single HUD line",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "codedby",
     "email": "astyk798@gmail.com"

@@ -2,54 +2,54 @@
 /**
  * statusline.mjs - Native Claude Code StatusLine HUD
  *
- * Setup: ~/.claude/settings.json > statusLine.command
- * Role: Claude Code sends stdin JSON, this outputs a 1-line ANSI HUD to stdout
- * Dependencies: Pure Node.js (no external packages)
+ * 설정: ~/.claude/settings.json > statusLine.command
+ * 역할: Claude Code가 stdin JSON을 보내면, 1줄 ANSI HUD를 stdout으로 출력
+ * 의존성: 순수 Node.js (외부 패키지 없음)
  *
- * ─── Output Format ────────────────────────────────────────────────────
+ * ─── 출력 형식 ───────────────────────────────────────────────────────
  *   Opus 4.6 | 🔒 relogin | 5h:45%(2h) wk:12%(5d) | ctx:[████████░░] 100k/200k | ~/2/m/f/src | sid:2ea2b | repo:branch | 23m $0.42 | in:45k out:12k | 12:34:56 | cache:67% | task:2/5 | agents:3(sub:2 team:1)
  *   ① model  ② relogin  ③ rateLimits             ④ contextBar                ⑤ cwd       ⑥ sessionId ⑦ gitInfo   ⑧ session  ⑨ tokenUsage    ⑩ lastAct  ⑪ cache  ⑫ taskProgress ⑬ activeAgents
  *
- * ─── Element Table ──────────────────────────────────────────────────
- *   Function           | Data Source                    | Cache Strategy             | Color Rule
+ * ─── 요소 테이블 ─────────────────────────────────────────────────────
+ *   함수명             | 데이터 소스                    | 캐시 방식                  | 색상 규칙
  *   ───────────────────┼────────────────────────────────┼────────────────────────────┼──────────────────────────
- *   renderSessionId    | stdin.session_id (first 5)     | none                       | purple fixed
- *   renderLastActivity | transcript file mtime          | none                       | dim fixed
- *   renderModel        | stdin.model.display_name       | none                       | cyan fixed
- *   (reloginWarning)   | fetchRateLimits.reloginNeeded  | (shared w/ fetchRateLimits)| yellow fixed
- *   formatTimeRemaining| resets_at (ISO 8601)           | none (inside formatRL)     | none (inherits parent)
- *   fetchRateLimits    | OAuth API (api.anthropic.com)  | file cache, 5min TTL, preemptive | green/yellow/red (70/90%)
- *   renderContextBar   | current_usage token sum        | none                       | green/yellow/red (70/85%) + 1M total red
- *   formatTokenCount   | (utility)                      | none                       | none
- *   renderTokenUsage   | stdin.context_window.total_*   | none                       | none (plain)
- *   renderCwd          | stdin.cwd (Fish-shell abbrev)  | none                       | none (plain)
- *   renderGitInfo      | git CLI (branch, remote URL)   | file cache, 5s TTL         | none (plain)
- *   renderSession      | stdin.cost (duration, usd)     | none                       | none (plain)
- *   renderCache        | stdin.context_window.usage     | none                       | green≥50 / yellow≥25 / dim
- *   renderTaskProgress | transcript JSONL parsing       | file cache, filesize-based | green=done / yellow=active / dim
- *   renderActiveAgents | transcript Agent tool_use      | file cache (shared)        | cyan fixed
+ *   renderSessionId    | stdin.session_id (앞 5자)      | 없음                       | purple 고정
+ *   renderLastActivity | transcript file mtime (마지막 활동 시각) | 없음                | dim 고정
+ *   renderModel        | stdin.model.display_name       | 없음                       | cyan 고정
+ *   (reloginWarning)   | fetchRateLimits.reloginNeeded  | (fetchRateLimits 캐시 공유) | yellow 고정
+ *   formatTimeRemaining| resets_at (ISO 8601)           | 없음 (formatRateLimits 내) | 없음 (부모 색상 계승)
+ *   fetchRateLimits    | OAuth API (api.anthropic.com)  | 파일 캐시, 5분 TTL, 선점갱신| green/yellow/red (70/90%)
+ *   renderContextBar   | current_usage 토큰 직접 합산   | 없음                       | green/yellow/red (70/85%) + 1M시 total red
+ *   formatTokenCount   | (유틸리티)                     | 없음                       | 없음
+ *   renderTokenUsage   | stdin.context_window.total_*   | 없음                       | 없음 (plain)
+ *   renderCwd          | stdin.cwd (Fish-shell 축약)    | 없음                       | 없음 (plain)
+ *   renderGitInfo      | git CLI (branch, remote URL)   | 파일 캐시, 5초 TTL         | 없음 (plain)
+ *   renderSession      | stdin.cost (duration, usd)     | 없음                       | 없음 (plain)
+ *   renderCache        | stdin.context_window.usage     | 없음                       | green≥50 / yellow≥25 / dim
+ *   renderTaskProgress | transcript JSONL 파싱          | 파일 캐시, 파일크기 기반   | green=완료 / yellow=진행중 / dim
+ *   renderActiveAgents | transcript Agent tool_use 파싱  | 파일 캐시 (공유)           | cyan 고정
  *
- * ─── OAuth Flow (fetchRateLimits) ───────────────────────────────────
- *   Read .credentials.json → check expiresAt → refresh if expired → GET /api/oauth/usage → write-back credentials
+ * ─── OAuth 플로우 (fetchRateLimits) ──────────────────────────────────
+ *   .credentials.json 읽기 → expiresAt 만료 확인 → refreshToken으로 갱신 → API GET /api/oauth/usage → credentials write-back
  *
- * ─── Cache Files (os.tmpdir()) ──────────────────────────────────────
- *   claude-hud-git-cache.json        — Git repo:branch (5s TTL)
- *   claude-hud-usage-cache.json      — Rate limit API response (5min TTL)
- *   claude-hud-transcript-cache.json — Transcript parse result (filesize-based)
- *   claude-hud-api-YYYY-MM-DD.log    — API call log (daily rotation, auto-deletes logs older than 1 day)
+ * ─── 캐시 파일 (os.tmpdir()) ─────────────────────────────────────────
+ *   claude-hud-git-cache.json        — Git 저장소:브랜치 (5초 TTL)
+ *   claude-hud-usage-cache.json      — Rate limit API 응답 (5분 TTL)
+ *   claude-hud-transcript-cache.json — Transcript 파싱 결과 (파일크기 비교)
+ *   claude-hud-api-YYYY-MM-DD.log    — API 호출 로그 (일별 로테이션, 하루 지난 파일 자동 삭제)
  *
- * ─── Error Handling ─────────────────────────────────────────────────
- *   Each render* function is wrapped in its own try-catch, returning '' on failure (one element fails ≠ all fail)
- *   Outer try-catch: on fatal errors (parse failure etc.), outputs nothing to hide the HUD
+ * ─── 에러 핸들링 ─────────────────────────────────────────────────────
+ *   각 render* 함수는 개별 try-catch로 감싸여 빈 문자열 반환 (한 요소 실패 ≠ 전체 실패)
+ *   최외곽 try-catch: 파싱 실패 등 치명적 에러 시 빈 출력으로 HUD 숨김
  *
- * ─── 429 Rate Limit Troubleshooting ────────────────────────────────
- *   Symptom: wk:% value freezes and stops updating
- *   Cause: API may return 429 when OAuth token is expired
- *   Fix: Log out of claude.ai → re-login to refresh OAuth token
- *        Or check if another session is over-calling the API (cache file is shared across sessions)
+ * ─── 429 Rate Limit 트러블슈팅 ──────────────────────────────────────
+ *   증상: wk:% 값이 멈추고 갱신되지 않음
+ *   원인: OAuth 토큰 만료 상태에서 API가 429를 반환할 수 있음
+ *   해결: claude.ai 로그아웃 → 재로그인으로 OAuth 토큰 갱신
+ *         또는 다른 세션이 API를 과다 호출 중인지 확인 (캐시 파일은 세션 간 공유)
  *
- * ─── Configuration ──────────────────────────────────────────────────
- *   Toggle each element on/off via CONFIG.elements object below
+ * ─── 설정 변경 ───────────────────────────────────────────────────────
+ *   아래 CONFIG.elements 객체에서 각 요소를 true/false로 토글하여 표시 여부 제어
  */
 
 import { execSync } from 'node:child_process';
@@ -58,7 +58,7 @@ import path from 'node:path';
 import os from 'node:os';
 import https from 'node:https';
 
-// ── Config ───────────────────────────────────────────────────────────────────
+// ── 설정 ──────────────────────────────────────────────────────────────────────
 const CONFIG = {
   elements: {
     sessionId: true,
@@ -84,7 +84,7 @@ const CONFIG = {
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const API_TIMEOUT_MS = 3000;
 
-// ── ANSI Colors ─────────────────────────────────────────────────────────────
+// ── ANSI 색상 ─────────────────────────────────────────────────────────────────
 const cyan   = (s) => `\x1b[36m${s}\x1b[0m`;
 const green  = (s) => `\x1b[32m${s}\x1b[0m`;
 const yellow = (s) => `\x1b[33m${s}\x1b[0m`;
@@ -93,7 +93,7 @@ const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
 const purple = (s) => `\x1b[38;2;150;162;252m${s}\x1b[0m`;
 const SEP    = dim(' | ');
 
-// ── Utilities ──────────────────────────────────────────────────────────────────
+// ── 유틸리티 ──────────────────────────────────────────────────────────────────
 function colorByThreshold(value, low, high, text) {
   if (value >= high) return red(text);
   if (value >= low)  return yellow(text);
@@ -115,9 +115,9 @@ function writeJsonAtomic(filePath, data) {
   }
 }
 
-// ── API Call Logging ────────────────────────────────────────────────────────────
+// ── API 호출 로그 ────────────────────────────────────────────────────────────
 function getApiLogFile() {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (local date via ISO)
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }); // YYYY-MM-DD (KST)
   return path.join(os.tmpdir(), `claude-hud-api-${today}.log`);
 }
 let activeTraceId = null;
@@ -128,7 +128,7 @@ function generateTraceId() {
 
 function appendApiLog(status, result, sessionId, traceId) {
   try {
-    const ts = new Date().toISOString();
+    const ts = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
     const sid = sessionId ? sessionId.slice(0, 8) : 'unknown';
     const tid = traceId ? ` | tid:${traceId}` : '';
     const line = `${ts} | sid:${sid} | pid:${process.pid}${tid} | HTTP ${status} | ${result}\n`;
@@ -139,10 +139,10 @@ function appendApiLog(status, result, sessionId, traceId) {
 function cleanupOldApiLogs() {
   try {
     const tmpDir = os.tmpdir();
-    // Delete logs from 2 days ago (keep today + yesterday)
-    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+    // 2일 전 로그 삭제 (오늘 + 어제는 보존)
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
     try { fs.unlinkSync(path.join(tmpDir, `claude-hud-api-${twoDaysAgo}.log`)); } catch { /* ignore */ }
-    // Delete legacy single log file
+    // 레거시 단일 로그 삭제
     try { fs.unlinkSync(path.join(tmpDir, 'claude-hud-api.log')); } catch { /* ignore */ }
   } catch { /* ignore */ }
 }
@@ -153,7 +153,7 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// ── Read stdin (3s timeout) ──────────────────────────────────────────────────
+// ── stdin 읽기 (3초 timeout) ──────────────────────────────────────────────────
 function readStdin() {
   return new Promise((resolve) => {
     const chunks = [];
@@ -171,7 +171,7 @@ function readStdin() {
   });
 }
 
-// ── Session ID (first 5 chars) ──────────────────────────────────────────────────────────
+// ── 세션 ID 앞 5자 ──────────────────────────────────────────────────────────
 function renderSessionId(sessionId) {
   if (!CONFIG.elements.sessionId || !sessionId) return '';
   try {
@@ -179,7 +179,7 @@ function renderSessionId(sessionId) {
   } catch { return ''; }
 }
 
-// ── Last activity time (transcript mtime) ─────────────────────────────────
+// ── 마지막 활동 시각 (transcript mtime 기반) ─────────────────────────────────
 function renderLastActivity(transcriptPath) {
   if (!CONFIG.elements.lastActivity || !transcriptPath) return '';
   try {
@@ -189,7 +189,7 @@ function renderLastActivity(transcriptPath) {
   } catch { return ''; }
 }
 
-// ── Model name rendering ─────────────────────────────────────────────────────────────
+// ── 모델명 렌더링 ─────────────────────────────────────────────────────────────
 function renderModel(model) {
   if (!CONFIG.elements.model) return '';
   try {
@@ -197,14 +197,14 @@ function renderModel(model) {
   } catch { return ''; }
 }
 
-// ── CWD display (Fish-shell style abbreviation) ────────────────────────────────────────
+// ── CWD 표시 (Fish-shell 스타일 축약) ────────────────────────────────────────
 function renderCwd(cwd) {
   if (!CONFIG.elements.cwd || !cwd) return '';
   try {
-    // Normalize Windows paths: backslash → forward slash
+    // Windows 경로 정규화: 백슬래시 → 슬래시
     let p = cwd.replace(/\\/g, '/');
 
-    // Replace homedir with ~
+    // homedir 치환
     const home = os.homedir().replace(/\\/g, '/');
     const isUnderHome = p.startsWith(home + '/') || p === home;
     if (isUnderHome) {
@@ -212,10 +212,10 @@ function renderCwd(cwd) {
     }
 
     const segments = p.split('/').filter(Boolean);
-    if (segments.length <= 1) return p; // "~" or drive root
+    if (segments.length <= 1) return p; // "~" 또는 드라이브 루트
 
-    // Fish-shell abbreviation: last segment in full, others first char only
-    // Keep Windows drive letters (C: etc) unabbreviated
+    // Fish-shell 축약: 마지막 세그먼트만 전체, 나머지는 첫 글자
+    // Windows 드라이브 문자 (C: 등)는 축약하지 않음
     const abbreviated = segments.map((seg, i) => {
       if (i === segments.length - 1) return seg;
       if (/^[A-Za-z]:$/.test(seg)) return seg;
@@ -226,7 +226,7 @@ function renderCwd(cwd) {
   } catch { return ''; }
 }
 
-// ── Git repo:branch (file cache, 5s TTL) ────────────────────────────────
+// ── Git 저장소명:브랜치 (파일 캐시, 5초 TTL) ────────────────────────────────
 function renderGitInfo(cwd) {
   const empty = { display: '', repoName: '' };
   if (!CONFIG.elements.gitBranch) return empty;
@@ -241,7 +241,7 @@ function renderGitInfo(cwd) {
     const opts = { cwd: cwd || undefined, encoding: 'utf-8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] };
     const branch = execSync('git branch --show-current', opts).trim();
 
-    // Extract repo name from remote URL: "repo.git" or "repo" → "repo"
+    // remote URL에서 저장소명 추출: "repo.git" 또는 "repo" → "repo"
     let repoName = '';
     try {
       const url = execSync('git remote get-url origin', opts).trim();
@@ -255,15 +255,15 @@ function renderGitInfo(cwd) {
   } catch { return empty; }
 }
 
-// ── HTTPS request utility ───────────────────────────────────────────────────────
-// Hard timeout: resolve no matter which stage (DNS/TCP/TLS) hangs
+// ── HTTPS 요청 유틸리티 ───────────────────────────────────────────────────────
+// hard timeout: DNS/TCP/TLS 어느 단계에서 막히든 반드시 resolve
 function httpsRequest(options, body) {
   return new Promise((resolve) => {
     const hardTimeout = options.timeout || API_TIMEOUT_MS;
     const hardTimer = setTimeout(() => {
       try { req.destroy(); } catch { /* ignore */ }
       resolve({ status: 0, data: null });
-    }, hardTimeout + 1000); // Socket timeout + 1s margin
+    }, hardTimeout + 1000); // 소켓 timeout + 여유 1초
 
     const req = https.request(options, (res) => {
       const chunks = [];
@@ -283,7 +283,7 @@ function httpsRequest(options, body) {
   });
 }
 
-// ── OAuth token refresh ──────────────────────────────────────────────────────────
+// ── OAuth 토큰 갱신 ──────────────────────────────────────────────────────────
 async function refreshAccessToken(refreshToken) {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -315,7 +315,7 @@ async function refreshAccessToken(refreshToken) {
   return { success: false, status: result?.status || 0 };
 }
 
-// ── Rate limits (OAuth API + 5min cache) ───────────────────────────────────────
+// ── 레이트 제한 (OAuth API + 5분 캐시) ───────────────────────────────────────
 async function fetchRateLimits(sessionId) {
   const R = (text, reloginNeeded = false) => ({ text, reloginNeeded });
   if (!CONFIG.elements.rateLimits) return R('');
@@ -323,7 +323,7 @@ async function fetchRateLimits(sessionId) {
   const cacheFile = path.join(os.tmpdir(), 'claude-hud-usage-cache.json');
   const cache = readJsonSafe(cacheFile);
 
-  // Invalidate refreshFailed cache: if credentials are newer than cache, user re-logged in → skip cache
+  // refreshFailed 캐시 무효화: credentials가 캐시보다 새로우면 재로그인 감지 → 캐시 무시
   const credsFresherThanCache = cache?.refreshFailed && (() => {
     try {
       const cp = path.join(os.homedir(), '.claude', '.credentials.json');
@@ -331,7 +331,7 @@ async function fetchRateLimits(sessionId) {
     } catch { return false; }
   })();
 
-  // Within TTL → skip API call (10min on 429 backoff, 5min normal)
+  // TTL 내 → API 호출 건너뛰기 (429 백오프 시 10분, 정상 시 5분)
   const effectiveTtl = cache?.backoff ? CONFIG.rateLimitBackoffTtlMs : CONFIG.rateLimitCacheTtlMs;
   if (cache?.timestamp && (Date.now() - cache.timestamp) < effectiveTtl && !credsFresherThanCache) {
     appendApiLog('-', cache?.backoff ? 'cache-hit(backoff)' : 'cache-hit', sessionId);
@@ -339,12 +339,12 @@ async function fetchRateLimits(sessionId) {
     return R(hasData ? formatRateLimits(cache.data, cache.lastSuccess) : '', !!cache?.refreshFailed);
   }
 
-  // Stale but valid data from previous TTL (fallback on API failure)
+  // TTL 만료된 기존 유효 데이터 (API 실패 시 fallback 용도)
   const validCache = cache?.data?.five_hour || cache?.data?.seven_day ? cache : null;
   const fallbackText = () => validCache?.data ? formatRateLimits(validCache.data, validCache.lastSuccess) : '';
 
   try {
-    // Read credentials
+    // credentials 읽기
     const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
     const creds = readJsonSafe(credPath);
     let oauth = creds?.claudeAiOauth;
@@ -353,7 +353,7 @@ async function fetchRateLimits(sessionId) {
       return R(fallbackText());
     }
 
-    // Refresh if expired
+    // 만료 시 갱신
     if (oauth.expiresAt && oauth.expiresAt < Date.now()) {
       if (!oauth.refreshToken) {
         appendApiLog('-', 'no-refresh-token', sessionId);
@@ -372,17 +372,17 @@ async function fetchRateLimits(sessionId) {
         return R(fallbackText(), true);
       }
 
-      // Write back refreshed tokens
+      // 갱신된 토큰 write-back
       const { success, ...tokens } = refreshed;
       oauth = { ...oauth, ...tokens };
       creds.claudeAiOauth = oauth;
       writeJsonAtomic(credPath, creds);
     }
 
-    // Clean up old log files (runs at API call intervals ~5min)
+    // 오래된 로그 파일 정리 (API 호출 시점 = 5분 간격)
     cleanupOldApiLogs();
 
-    // Preempt cache timestamp before API call → prevent duplicate calls from other sessions
+    // API 호출 전 캐시 timestamp 선점 → 다른 세션의 중복 호출 방지
     const traceId = generateTraceId();
     activeTraceId = traceId;
     writeJsonAtomic(cacheFile, {
@@ -392,7 +392,7 @@ async function fetchRateLimits(sessionId) {
     });
     appendApiLog('-', 'pre-fetch', sessionId, traceId);
 
-    // API call (hard timeout prevents DNS/TCP hanging)
+    // API 호출 (hard timeout으로 DNS/TCP hanging 방지)
     const result = await httpsRequest({
       hostname: 'api.anthropic.com',
       path: '/api/oauth/usage',
@@ -406,7 +406,7 @@ async function fetchRateLimits(sessionId) {
     });
     activeTraceId = null;
 
-    // Log API result
+    // API 결과 로그
     appendApiLog(result.status, result.data ? 'ok' : 'fail', sessionId, traceId);
 
     if (result.data) {
@@ -415,7 +415,7 @@ async function fetchRateLimits(sessionId) {
       return R(formatRateLimits(result.data, now));
     }
 
-    // 429 → backoff mode (10min TTL)
+    // 429 → 백오프 모드 (10분 TTL)
     if (result.status === 429) {
       appendApiLog('-', 'backoff-enabled(10m)', sessionId, traceId);
       writeJsonAtomic(cacheFile, {
@@ -427,12 +427,12 @@ async function fetchRateLimits(sessionId) {
       return R(fallbackText());
     }
 
-    // On API failure, cache was already preempted → no extra update needed (preserve lastSuccess)
+    // API 실패 시 캐시는 이미 선점됨 → 추가 갱신 불필요 (lastSuccess만 보존)
   } catch (err) {
     const tid = activeTraceId;
     activeTraceId = null;
     appendApiLog(0, `error:${err?.message || 'unknown'}`, sessionId, tid);
-    // Update timestamp even on exception (preserve lastSuccess)
+    // 예외 발생 시에도 타임스탬프 갱신 (lastSuccess는 유지)
     writeJsonAtomic(cacheFile, {
       timestamp: Date.now(),
       lastSuccess: validCache?.lastSuccess || null,
@@ -458,7 +458,7 @@ function formatTimeRemaining(resetsAt) {
 }
 
 function formatRateLimits(usage, lastSuccess) {
-  // Mark stale if lastSuccess is >12min old (10min backoff + 2min margin)
+  // lastSuccess가 12분 이상 지나면 stale 표시 (백오프 10분 + 여유 2분)
   const stale = lastSuccess && (Date.now() - lastSuccess > 12 * 60_000);
   const staleMark = stale ? '~' : '';
   const parts = [];
@@ -477,7 +477,7 @@ function formatRateLimits(usage, lastSuccess) {
   return parts.join(' ');
 }
 
-// ── Context usage calculation utility ────────────────────────────────────────────
+// ── 컨텍스트 사용량 계산 유틸리티 ────────────────────────────────────────────
 function calcContextUsage(ctxWindow) {
   const windowSize = ctxWindow?.context_window_size || 200000;
   const usage = ctxWindow?.current_usage;
@@ -495,7 +495,7 @@ function calcContextUsage(ctxWindow) {
   return null;
 }
 
-// ── Token count formatting utility ────────────────────────────────────────────────────
+// ── 토큰 수 축약 유틸리티 ────────────────────────────────────────────────────
 function formatTokenCount(tokens) {
   if (tokens >= 999_500) {
     const m = tokens / 1_000_000;
@@ -504,7 +504,7 @@ function formatTokenCount(tokens) {
   return `${Math.round(tokens / 1000)}k`;
 }
 
-// ── Context bar (direct current_usage token sum) ────────────────────
+// ── 컨텍스트 바 (current_usage 직접 합산 — ssenart 방식) ────────────────────
 function renderContextBar(ctxWindow) {
   if (!CONFIG.elements.contextBar) return '';
   try {
@@ -522,7 +522,7 @@ function renderContextBar(ctxWindow) {
     const warning = pct >= CONFIG.thresholds.contextCritical ? ' COMPACT!' : '';
     const is1M = windowSize >= 1_000_000;
     if (is1M) {
-      // 1M: only total in red, warning uses threshold color
+      // 1M: total만 red, warning은 threshold 색상 적용
       const barPart = colorByThreshold(pct, CONFIG.thresholds.contextWarning, CONFIG.thresholds.contextCritical, `ctx:[${bar}] ${used}/`);
       const coloredWarning = warning ? colorByThreshold(pct, CONFIG.thresholds.contextWarning, CONFIG.thresholds.contextCritical, warning) : '';
       return `${barPart}${red(total)}${coloredWarning}`;
@@ -532,7 +532,7 @@ function renderContextBar(ctxWindow) {
   } catch { return ''; }
 }
 
-// ── Context file management (hook bridge) ──────────────────────────────────────────
+// ── 컨텍스트 파일 관리 (훅 브릿지) ──────────────────────────────────────────
 function manageContextFiles(ctxWindow, sessionId) {
   if (!sessionId || !ctxWindow) return;
   try {
@@ -547,12 +547,12 @@ function manageContextFiles(ctxWindow, sessionId) {
 
     const ctxData = { pct, used: usedTokens, total: windowSize, timestamp: Date.now() };
 
-    // Ensure directory exists
+    // 디렉토리 확인
     if (!fs.existsSync(sessionDir)) {
       fs.mkdirSync(sessionDir, { recursive: true });
     }
 
-    // No hud.json → first-time creation + hook.json creation
+    // hud.json 없음 → 최초 생성 + hook.json 생성
     if (!fs.existsSync(hudFile)) {
       writeJsonAtomic(hudFile, ctxData);
       writeJsonAtomic(hookFile, ctxData);
@@ -560,14 +560,14 @@ function manageContextFiles(ctxWindow, sessionId) {
       return;
     }
 
-    // hud.json exists → compare at 10% step intervals
+    // hud.json 있음 → 10% 단위 비교
     const prev = readJsonSafe(hudFile);
     if (!prev) {
       writeJsonAtomic(hudFile, ctxData);
       return;
     }
 
-    // 5% step if >=50%, 10% step if <50%
+    // 50% 이상이면 5% 단위, 미만이면 10% 단위
     const step = pct >= 50 || prev.pct >= 50 ? 5 : 10;
     const prevBase = Math.floor(prev.pct / step) * step;
     const currBase = Math.floor(pct / step) * step;
@@ -582,14 +582,14 @@ function manageContextFiles(ctxWindow, sessionId) {
 
 function appendCtxLog(logFile, sessionId, message) {
   try {
-    const ts = new Date().toISOString();
+    const ts = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
     const sid = sessionId ? sessionId.slice(0, 8) : 'unknown';
     fs.appendFileSync(logFile, `${ts} | sid:${sid} | ${message}\n`);
   } catch { /* ignore */ }
 }
-// ── Context file management end ────────────────────────────────────────────
+// ── 컨텍스트 파일 관리 끝 ────────────────────────────────────────────────────
 
-// ── Session cumulative token usage ────────────────────────────────────────────────────
+// ── 세션 누적 토큰 사용량 ────────────────────────────────────────────────────
 function renderTokenUsage(ctxWindow) {
   if (!CONFIG.elements.tokenUsage || !ctxWindow) return '';
   try {
@@ -604,7 +604,7 @@ function renderTokenUsage(ctxWindow) {
   } catch { return ''; }
 }
 
-// ── Session info (elapsed time + cost) ─────────────────────────────────────────────
+// ── 세션 정보 (경과 시간 + 비용) ─────────────────────────────────────────────
 function renderSession(cost) {
   if (!CONFIG.elements.sessionInfo) return '';
   try {
@@ -629,7 +629,7 @@ function renderSession(cost) {
   } catch { return ''; }
 }
 
-// ── Cache efficiency ────────────────────────────────────────────────────────────────
+// ── 캐시 효율 ────────────────────────────────────────────────────────────────
 function renderCache(currentUsage) {
   if (!CONFIG.elements.cacheEfficiency || !currentUsage) return '';
   try {
@@ -649,7 +649,7 @@ function renderCache(currentUsage) {
   } catch { return ''; }
 }
 
-// ── Transcript parsing (filesize-based cache) ─────────────────────────────────────
+// ── Transcript 파싱 (파일 크기 기반 캐시) ─────────────────────────────────────
 function parseTranscript(transcriptPath) {
   if (!transcriptPath) return null;
   try {
@@ -657,7 +657,7 @@ function parseTranscript(transcriptPath) {
     const stat = fs.statSync(transcriptPath);
     const cache = readJsonSafe(cacheFile);
 
-    // Same file size → no change (append-only log)
+    // 파일 크기 동일 → append-only이므로 변경 없음
     if (cache && cache.path === transcriptPath && cache.size === stat.size) {
       return cache.data;
     }
@@ -678,7 +678,7 @@ function parseTranscript(transcriptPath) {
           for (const block of j.message.content) {
             if (block.type !== 'tool_use') continue;
 
-            // Track Agent invocations
+            // Agent 호출 추적
             if (block.name === 'Agent') {
               agentMap[block.id] = {
                 type: block.input?.subagent_type || 'unknown',
@@ -690,13 +690,13 @@ function parseTranscript(transcriptPath) {
               };
             }
 
-            // Team deleted → mark all agents in that team as completed
+            // 팀 삭제 → 해당 팀의 모든 에이전트 completed
             if (block.name === 'TeamDelete') {
               for (const a of Object.values(agentMap)) {
                 if (a.isTeam) a.status = 'completed';
               }
             }
-            // shutdown_request → mark the matching teammate as completed (exact name match)
+            // shutdown_request → 해당 팀메이트 completed (name 필드로 정확 매칭)
             if (block.name === 'SendMessage' && block.input?.type === 'shutdown_request' && block.input?.recipient) {
               const recipient = block.input.recipient;
               for (const a of Object.values(agentMap)) {
@@ -707,7 +707,7 @@ function parseTranscript(transcriptPath) {
             if (block.name === 'TaskCreate') {
               taskCreateCount++;
               if (block.input?.activeForm) {
-                // At TaskCreate time, ID is unknown — store by sequence number temporarily
+                // TaskCreate 시점에서는 아직 ID를 모르므로 순번으로 임시 저장
                 taskActiveForm[`_pending_${taskCreateCount}`] = block.input.activeForm;
               }
             }
@@ -718,13 +718,13 @@ function parseTranscript(transcriptPath) {
           }
         }
 
-        // Detect Agent completion from tool_result
+        // tool_result에서 Agent 완료 감지
         if (j.type === 'user' && Array.isArray(j.message?.content)) {
           for (const block of j.message.content) {
             if (block.type === 'tool_result' && agentMap[block.tool_use_id]) {
-              // Background/team agents get immediate tool_result but are still running
-              // - Background: "Async agent launched..."
-              // - Team spawn: "Spawned successfully..."
+              // 백그라운드/팀 에이전트는 즉시 tool_result가 오지만 아직 running
+              // - 백그라운드: "Async agent launched..."
+              // - 팀 스폰: "Spawned successfully..."
               const text = Array.isArray(block.content)
                 ? block.content.map(c => c.text || '').join('')
                 : (block.content || '');
@@ -737,9 +737,9 @@ function parseTranscript(transcriptPath) {
           }
         }
 
-        // Detect background agent completion via task-notification
-        // - string content in user messages, or
-        // - content field in queue-operation messages
+        // task-notification으로 백그라운드 에이전트 완료 감지
+        // - user 메시지의 문자열 content 또는
+        // - queue-operation의 content 필드로 전달됨
         {
           const msg = (j.type === 'user' && typeof j.message?.content === 'string')
             ? j.message.content
@@ -757,7 +757,7 @@ function parseTranscript(transcriptPath) {
         if (j.type === 'user' && j.toolUseResult) {
           const r = typeof j.toolUseResult === 'string' ? JSON.parse(j.toolUseResult) : j.toolUseResult;
           if (r.task?.id) {
-            // Map TaskCreate result ID to sequence number → activeForm mapping
+            // TaskCreate 결과의 id와 순번이 일치 → activeForm 매핑
             for (const k of Object.keys(taskActiveForm)) {
               if (k.startsWith('_pending_')) {
                 taskActiveForm[r.task.id] = taskActiveForm[k];
@@ -770,15 +770,15 @@ function parseTranscript(transcriptPath) {
       } catch { /* skip malformed lines */ }
     }
 
-    // Aggregation
-    // totalTasks: max of TaskCreate count and unique taskIds from TaskUpdate
-    // (Tasks created by team agents only appear as TaskUpdate in main transcript, no TaskCreate)
+    // 집계
+    // totalTasks: TaskCreate 수와 TaskUpdate에서 참조된 고유 taskId 수 중 큰 값 사용
+    // (팀 에이전트가 생성한 태스크는 메인 transcript에 TaskCreate 없이 TaskUpdate만 존재)
     const allKnownIds = Object.keys(taskStatus).length;
     const deletedCount = Object.values(taskStatus).filter(s => s === 'deleted').length;
     const completedCount = Object.values(taskStatus).filter(s => s === 'completed').length;
     const totalTasks = Math.max(taskCreateCount, allKnownIds) - deletedCount;
 
-    // Find activeForm of in_progress tasks
+    // in_progress 태스크의 activeForm 찾기
     let working = '';
     for (const [id, status] of Object.entries(taskStatus)) {
       if (status === 'in_progress' && taskActiveForm[id]) {
@@ -787,7 +787,7 @@ function parseTranscript(transcriptPath) {
       }
     }
 
-    // Aggregate active agents
+    // 활성 에이전트 집계
     const activeAgents = Object.values(agentMap).filter(a => a.status === 'running');
 
     const data = { totalTasks, completedTasks: Math.min(completedCount, totalTasks), working, activeAgents };
@@ -813,11 +813,11 @@ function renderTaskProgress(stats) {
   } catch { return ''; }
 }
 
-// ── Active agents display ─────────────────────────────────────────────────────────
+// ── 활성 에이전트 표시 ─────────────────────────────────────────────────────────
 function renderActiveAgents(agents) {
   if (!CONFIG.elements.activeAgents || !agents || agents.length === 0) return '';
   try {
-    // Classify into subagents / team members
+    // 서브에이전트 / 팀 멤버 분류
     const subs = agents.filter(a => !a.isTeam);
     const team = agents.filter(a => a.isTeam);
 
@@ -830,7 +830,7 @@ function renderActiveAgents(agents) {
   } catch { return ''; }
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── 메인 ──────────────────────────────────────────────────────────────────────
 try {
   const raw = await readStdin();
   if (!raw.trim()) process.exit(0);
@@ -838,14 +838,14 @@ try {
   const data = JSON.parse(raw);
   const cwd  = data.cwd || process.cwd();
 
-  // Run async elements in parallel (hard timeout guarantees completion within 4s)
+  // 비동기 요소 병렬 실행 (hard timeout으로 최대 4초 내 완료 보장)
   const [rateLimitResult] = await Promise.all([
     fetchRateLimits(data.session_id),
   ]);
   const rateLimits = rateLimitResult.text;
   const reloginWarning = rateLimitResult.reloginNeeded ? yellow('\uD83D\uDD12 relogin') : '';
 
-  // Render sync elements
+  // 동기 요소 렌더링
   const model     = renderModel(data.model);
   const cwdResult = renderCwd(cwd);
   const gitResult = renderGitInfo(cwd);  // { display, repoName }
@@ -855,16 +855,16 @@ try {
   const session   = renderSession(data.cost);
   const cache     = renderCache(data.context_window?.current_usage);
 
-  // If cwd last dir matches repo name → hide cwd (deduplicate)
+  // cwd 마지막 디렉토리와 repo명이 같으면 → cwd 생략 (중복 제거)
   const cwdLastDir = cwd.replace(/\\/g, '/').split('/').filter(Boolean).pop() || '';
   const showCwd = cwdResult && (cwdLastDir !== gitResult.repoName);
 
-  // Parse transcript
+  // transcript 파싱
   const stats = parseTranscript(data.transcript_path);
   const task   = renderTaskProgress(stats);
   const agents = renderActiveAgents(stats?.activeAgents);
 
-  // Assemble single line
+  // 1줄 조합
   const lastActivity = renderLastActivity(data.transcript_path);
 
   const sessionIdShort = renderSessionId(data.session_id);
@@ -885,5 +885,5 @@ try {
   }
 
 } catch {
-  // Outer error → empty output (hide HUD)
+  // 최외곽 에러 → 빈 출력 (HUD 숨김)
 }

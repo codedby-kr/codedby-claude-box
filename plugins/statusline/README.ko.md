@@ -4,7 +4,7 @@
 
 Claude Code 세션의 모든 정보를 화면 하단 한 줄에 보여줍니다.
 
-**Latest: v1.0.0** · [Changelog](./CHANGELOG.md)
+**Latest: v1.0.1** · [Changelog](./CHANGELOG.md)
 
 Claude Code의 세션 데이터 대부분은 눈에 보이지 않습니다. 레이트 리밋, 컨텍스트 사용량, 토큰 비용, git 상태, 활성 에이전트 — 문제가 생기고 나서야 알게 됩니다. 이 플러그인은 이 모든 정보를 하단 상태 바에 렌더링하며, 프롬프트마다 자동으로 갱신합니다.
 
