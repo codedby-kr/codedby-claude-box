@@ -4,7 +4,7 @@
 
 **No copy-paste — claude.ai and Claude Code talk directly.**
 
-**Latest: v1.8.0** · [Changelog](./CHANGELOG.md)
+**Latest: v1.9.0** · [Changelog](./CHANGELOG.md)
 
 PEV Loop (Plan → Execute → Verify), Multi-Agent Orchestration —
 the key patterns in 2026 AI development all point in one direction:
@@ -208,11 +208,24 @@ File attachment: `"attach main.py and ask claude.ai to review it"`
 |---------|-------------|
 | `/ask-claude-web:execute-loop-doc` | Execute a documented work plan item by item. Web Claude acts as manager — gives instructions, reviews results, requests corrections. Supports standalone mode (self-verify only). |
 | `/ask-claude-web:execute-loop-msg` | Same loop execution, but builds the work plan from your message instead of a document. |
+| `/ask-claude-web:localize-ko` | Switch the plugin's docs and scripts to Korean. English originals are backed up as `.en.md`/`.en.mjs`. |
+| `/ask-claude-web:localize-en` | Switch back to English. Restores the `.en.md`/`.en.mjs` backups and removes them, returning to the pristine state. |
 
 ```
 /ask-claude-web:execute-loop-doc "path/to/plan.md" web claude verify
 /ask-claude-web:execute-loop-msg refactor auth module, web claude verify
 ```
+
+### Switching Language
+
+All docs and scripts (skill, commands, README) can be switched to Korean and back:
+
+```
+/ask-claude-web:localize-ko   # → Korean (English originals saved as .en.md/.en.mjs)
+/ask-claude-web:localize-en   # → English (restores the .en backups, then removes them)
+```
+
+`localize-en` is a no-op if the plugin is already in English.
 
 <details>
 <summary><strong>Platform Support</strong></summary>

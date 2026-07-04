@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.0
+- New command `/ask-claude-web:localize-en` — reverses `localize-ko`: restores English docs/scripts from the `.en.md`/`.en.mjs` backups, then removes those backups to return the plugin to its pristine English state. No-op when already English. The plugin language can now be toggled both ways (`localize-ko` ↔ `localize-en`).
+
 ## 1.8.0
 - DOM selectors generalized to **L1 (exact aria-label) → L2 (bilingual regex)** resolution — tolerates claude.ai label drift, dynamic suffixes, and EN/KR with no code change
 - Fixed file-attachment detection: claude.ai changed the remove-button aria-label to `"<timestamp>_<filename> 제거"`; now matched by suffix regex (was exact-match → counted 0 → false `MISSING_ATTACHMENTS`)

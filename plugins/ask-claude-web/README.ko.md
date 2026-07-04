@@ -4,7 +4,7 @@
 
 **복사-붙여넣기 없이 claude.ai와 Claude Code가 직접 대화합니다.**
 
-**최신: v1.8.0** · [변경 이력](./CHANGELOG.md)
+**최신: v1.9.0** · [변경 이력](./CHANGELOG.md)
 
 PEV Loop (Plan → Execute → Verify), Multi-Agent Orchestration —
 2026년 AI 개발의 핵심 패턴들은 모두 "AI가 혼자 하지 않고, 역할을 나눠서 협업한다"는
@@ -210,6 +210,7 @@ claude plugin update ask-claude-web@codedby-claude-box -s user
 | `/ask-claude-web:execute-loop-doc` | 문서에 기술된 작업 계획을 항목별로 실행. 웹 클로드가 중간 관리자 역할 — 지시, 검토, 수정 요청. 단독 모드(자체 검증)도 지원. |
 | `/ask-claude-web:execute-loop-msg` | 동일한 반복 실행이지만 문서 대신 사용자 메시지에서 작업 계획을 구성. |
 | `/ask-claude-web:localize-ko` | 플러그인의 문서와 스크립트를 한국어로 전환. 영어 원본은 `.en.md`/`.en.mjs`로 백업. |
+| `/ask-claude-web:localize-en` | 다시 영문으로 되돌리기. `.en.md`/`.en.mjs` 백업을 복원하고 백업을 제거해 원본 상태로 복귀. |
 
 ```
 /ask-claude-web:execute-loop-doc "계획문서/경로.md" 웹 클로드 검증
@@ -227,6 +228,14 @@ claude plugin update ask-claude-web@codedby-claude-box -s user
 ```
 
 영어 원본은 `.en.md`/`.en.mjs`로 자동 백업되며, 원본이 사라지지 않습니다.
+
+다시 영문으로 되돌리려면:
+
+```
+/ask-claude-web:localize-en
+```
+
+백업해 둔 영어 원본을 복원하고 `.en` 백업을 제거해 원래 상태로 되돌립니다. 이미 영문이면 아무 작업도 하지 않습니다.
 
 <details>
 <summary><strong>플랫폼 지원</strong></summary>

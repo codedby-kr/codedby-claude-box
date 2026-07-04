@@ -1,7 +1,7 @@
 {
   "name": "ask-claude-web",
   "description": "Two Claudes talk to each other — Claude Code asks claude.ai directly, gets answers, and acts on them",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "author": {
     "name": "codedby",
     "email": "astyk798@gmail.com"
