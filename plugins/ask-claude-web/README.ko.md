@@ -4,7 +4,7 @@
 
 **복사-붙여넣기 없이 claude.ai와 Claude Code가 직접 대화합니다.**
 
-**최신: v1.7.0** · [변경 이력](./CHANGELOG.md)
+**최신: v1.8.0** · [변경 이력](./CHANGELOG.md)
 
 PEV Loop (Plan → Execute → Verify), Multi-Agent Orchestration —
 2026년 AI 개발의 핵심 패턴들은 모두 "AI가 혼자 하지 않고, 역할을 나눠서 협업한다"는
@@ -245,7 +245,7 @@ Linux: `sudo apt install xclip` 필요.
 <details>
 <summary><strong>제한 사항</strong></summary>
 
-- **DOM 의존성**: claude.ai UI 업데이트 시 셀렉터가 깨질 수 있음. 스킬에 fallback 체인이 포함되어 있고, Claude Code가 새 셀렉터를 탐색해서 스킬에 기록하도록 가이드하므로 자체 복구가 가능.
+- **DOM 의존성**: claude.ai UI 업데이트 시 셀렉터가 깨질 수 있음. 셀렉터는 **L1(정확 aria-label) → L2(양국어 정규식)** 순으로 해석해 라벨/언어 변화를 흡수하며, 그래도 실패하면 스킬이 **중단하고 진단을 보고한 뒤 사용자 컨펌을 받아 수정**합니다(맹목적 자율 수정 없음).
 - **Chrome 수동 설정**: 원격 디버깅을 수동으로 활성화해야 함.
 - **세션 권한**: Chrome 권한 대화상자가 세션마다 한 번 표시.
 - **Chrome 창 필요**: Chrome이 실행 중이어야 하며, GUI 없이 백그라운드로만 실행하는 헤드리스 모드는 지원하지 않음. (다른 탭에서 작업하거나 Chrome 창이 가려지는 것은 문제 없음)

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.0
+- DOM selectors generalized to **L1 (exact aria-label) → L2 (bilingual regex)** resolution — tolerates claude.ai label drift, dynamic suffixes, and EN/KR with no code change
+- Fixed file-attachment detection: claude.ai changed the remove-button aria-label to `"<timestamp>_<filename> 제거"`; now matched by suffix regex (was exact-match → counted 0 → false `MISSING_ATTACHMENTS`)
+- Fixed response extraction: timestamp sibling (`"오전 12:25"`) was mis-extracted; now skipped via time-pattern + content-element checks, and `.font-claude-response` is preferred for clean text (no sr-only "Claude 응답:" heading duplication)
+- extract-response.js: added read-only structural fallback (L3) when ancestor-sibling traversal can't reach the response
+- send.js: send button now polled until present **and** enabled (fixes `SEND_BTN_NOT_FOUND` race on a fresh tab's first message, where React renders the button after the fixed 300ms wait); `input` event dispatched to reinforce React registration
+- send.js: wait for ProseMirror to normalize `<div>` line breaks into `<p>` before clicking send — fixes multiline text being dropped (only the attached file sent) when a file was attached; the adaptive send-button polling removed the old fixed-delay cushion that had masked this normalization race
+- send.js: `getFileNames` reads filenames from remove-button aria-label and chip leaf text (was empty `textContent`); `SEND_BTN_NOT_FOUND` now returns a compact `buttons` list as self-heal diagnostic
+- SKILL.md/SKILL.ko.md: new "Robustness & Selector Resolution" and "Self-heal on Unrecoverable Break" sections (halt → report → user-chosen repair path: inline / isolated subagent / fresh session; confirm + live re-verify before applying)
+
 ## 1.7.0
 - Major SKILL.md refactoring: 597 lines → 270 lines (55% reduction)
 - Replaced inline scripts with hint-based approach + 3 external scripts (send.js, wait-streaming.js, extract-response.js)

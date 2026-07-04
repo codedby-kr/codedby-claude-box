@@ -4,7 +4,7 @@
 
 **No copy-paste — claude.ai and Claude Code talk directly.**
 
-**Latest: v1.7.0** · [Changelog](./CHANGELOG.md)
+**Latest: v1.8.0** · [Changelog](./CHANGELOG.md)
 
 PEV Loop (Plan → Execute → Verify), Multi-Agent Orchestration —
 the key patterns in 2026 AI development all point in one direction:
@@ -231,7 +231,7 @@ Linux: `sudo apt install xclip` required.
 <details>
 <summary><strong>Limitations</strong></summary>
 
-- **DOM Dependency**: claude.ai UI updates may break selectors. The skill includes fallback chains, and Claude Code can discover new selectors and record them in the skill — enabling self-recovery.
+- **DOM Dependency**: claude.ai UI updates may break selectors. Selectors resolve **L1 (exact aria-label) → L2 (bilingual regex)** to absorb label/language drift; if that still fails, the skill **halts, reports a diagnosis, and applies a user-confirmed fix** (no blind autonomous edits).
 - **Manual Chrome Setup**: Remote debugging must be enabled manually.
 - **Session Permission**: Chrome permission dialog appears once per session.
 - **Chrome Window Required**: Chrome must be running — headless (GUI-less background) mode is not supported. (Working in other tabs or having the Chrome window behind other windows is fine)

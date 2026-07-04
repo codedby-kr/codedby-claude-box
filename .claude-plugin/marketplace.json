@@ -12,7 +12,7 @@
       "name": "ask-claude-web",
       "source": "./plugins/ask-claude-web",
       "description": "Two Claudes talk to each other — Claude Code asks claude.ai directly, gets answers, and acts on them",
-      "version": "1.7.0"
+      "version": "1.8.0"
     },
     {
       "name": "statusline",

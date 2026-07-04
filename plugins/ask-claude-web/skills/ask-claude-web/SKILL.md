@@ -58,9 +58,8 @@ Multiple file paths → single Ctrl+V attaches all.
    `press_key` — `Control+v` (Windows/Linux) or `Meta+v` (macOS)
 
 4. (Optional) Verify file attachment (evaluate_script, ~100 tokens):
-   - Search leaf elements (children ≤ 3) for filename text (textContent under 100 chars)
-   - Use original filename without extension for partial matching (files get timestamp prefix)
-   - Return: { attached: bool, matches: [{tag, text}] }
+   - Count remove buttons in `fieldset` via the File-remove regex; filenames come from the remove-button aria-label (`"<ts>_<file> 제거"`) or chip leaf text (`"<ts>_<file>"`) — strip the `^\d+_` timestamp prefix
+   - Return: { count, names: [filename] }
 
 5. Run send.js with `__EXPECTED_ATTACHMENTS__` = file count. See "Run send.js" below.
 
@@ -75,8 +74,8 @@ Handle results:
 - { sent: false, error: 'STILL_STREAMING' } → wait for response, then retry
 - { sent: false, error: 'CLEANUP_FAILED' } → retry send.js
 - { sent: false, error: 'MISSING_ATTACHMENTS' } → re-paste files, then retry
-- { sent: false, error: 'SEND_BTN_NOT_FOUND' } → UI changed, explore DOM
-- { error: 'INPUT_NOT_FOUND' } → UI changed, explore DOM
+- { sent: false, error: 'SEND_BTN_NOT_FOUND' } → L2 regex fallback also failed; see "Self-heal on Unrecoverable Break" (the returned `buttons` list is the diagnostic)
+- { error: 'INPUT_NOT_FOUND' } → L2 fallback also failed; see "Self-heal on Unrecoverable Break"
 
 ### Send confirmation — health check (single async evaluate_script)
 
@@ -239,27 +238,39 @@ After your review, end your response with exactly one of:
 
 ---
 
-## Selector Changes
+## Robustness & Selector Resolution
 
-When a selector fails, explore DOM via `evaluate_script` to find a replacement. Keep old selectors as fallbacks and record in the Verified Selectors table.
+Scripts resolve UI elements **L1 (exact aria-label) → L2 (bilingual regex)**, never a single hardcoded string. This tolerates label drift, dynamic suffixes (e.g. `"<ts>_<file>.png 제거"`), and EN/KR language with no code change. Preference order: stable anchors (`data-testid`, ARIA role/heading, live-region status) > regex on aria-label/text > structural position. Build-generated CSS classes are never the sole hook (`.font-claude-response` is a *preferred* path with fallback).
 
-## Verified Selectors & Methods
+Regex the scripts use (one pattern covers both languages):
+- Stop button: `/(중단|중지|stop\s*response)/i`
+- Send button: `/(보내기|전송|send\s*message)/i`
+- File remove: `/(제거|삭제|remove|delete)\s*$/i` — suffix match, handles both `"제거"` and `"<ts>_<file> 제거"`
 
-| Component | Selector / Value | Language | Verified | Notes |
-|-----------|-----------------|----------|----------|-------|
-| Stop button | `"Stop response"` | EN | 2026-03-25 | Primary |
-| Stop button | `"응답 중단"` | KO | 2026-03-25 | Primary |
-| Stop button | `"Stop Response"`, `"응답 중지"` | EN/KO | 2026-03-22 | Fallback |
-| File remove | `"Remove"` | EN | 2026-03-25 | |
-| File remove | `"제거"` | KO | 2026-03-23 | |
-| Send button | `"Send Message"` | EN | 2026-03-28 | |
-| Send button | `"메시지 보내기"` | KO | 2026-03-28 | |
+**Read vs action asymmetry**: extraction (read-only) may fall back to structural scoring (L3) because a wrong pick is caught by post-extraction context verification; sending/removing (actions) stop at L2 and **halt rather than guess**, since a wrong action is hard to undo.
 
-File remove fallback (if aria-label selectors fail):
-1. Enumerate all fieldset buttons by aria-label, title, SVG
-2. Find sibling buttons of filename elements
-3. Try variants: "Delete", "삭제", "Close"
-4. Last resort: SVG-only buttons next to filename elements
+## Verified Selectors
+
+| Component | Resolution | Verified | Notes |
+|-----------|-----------|----------|-------|
+| Stop button | regex above; L1 exact `"응답 중단"` / `"Stop response"` | 2026-06-25 | also `[data-is-streaming="true"]` |
+| File remove | regex above (suffix) | 2026-06-25 | handles `"<ts>_<file> 제거"` dynamic label |
+| Send button | regex above; L1 exact `"메시지 보내기"` / `"Send Message"` | 2026-06-25 | poll until present **and** enabled (React render race) |
+| Response body | `.font-claude-response` (preferred) → content-bearing sibling of last user-message → structural (L3) | 2026-06-25 | clean text, no sr-only "Claude 응답:" heading |
+| User anchor | `[data-testid="user-message"]` | 2026-06-25 | extraction anchor — most critical dependency |
+
+## Self-heal on Unrecoverable Break (L2 fallback also failed)
+
+claude.ai's DOM structure does not change mid-session (the SPA bundle is fixed at page load); a real structural break surfaces at session start / page (re)load — usually while the user is present. So autonomous repair is unnecessary; a confirmed, human-reviewed fix is safer.
+
+1. **Stop using the skill immediately** — do not keep retrying web Claude with a broken selector (avoids cascading errors and token waste).
+2. **Report what broke**: the failed action/selector + the actual aria-labels/structure observed in the DOM (scripts return a compact `buttons` list on `SEND_BTN_NOT_FOUND`; gather equivalents for other failures — **never take_snapshot**).
+3. **Offer repair paths, let the user choose** (judge the default by task weight):
+   - (a) fix now in this session
+   - (b) fix via an isolated subagent (only a summary returns → minimal main-context pollution)
+   - (c) drop the diagnosis to an `.md` in a temp dir and fix in a fresh session
+   - Default: skill still needed → (b)/(a); main task heavy and skill no longer needed → (c)
+4. Apply any fix **only after user confirmation**, and **re-verify proposed selectors against the live DOM** — do not blindly trust a prior diagnosis (the DOM may have changed again).
 
 ## Troubleshooting
 

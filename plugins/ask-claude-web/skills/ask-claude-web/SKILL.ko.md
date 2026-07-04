@@ -58,9 +58,8 @@ send.js를 `__EXPECTED_ATTACHMENTS__` = 0으로 실행. 아래 "send.js 실행" 
    `press_key` — `Control+v` (Windows/Linux) 또는 `Meta+v` (macOS)
 
 4. (선택) 파일 첨부 확인 (evaluate_script, ~100토큰):
-   - 리프 요소(children ≤ 3)에서 파일명 텍스트 검색 (textContent 100자 미만)
-   - 타임스탬프 접두사 대비 확장자 없는 원본 파일명으로 부분 매칭
-   - 반환: { attached: bool, matches: [{tag, text}] }
+   - `fieldset` 내 삭제 버튼 수를 파일삭제 정규식으로 카운트; 파일명은 삭제 버튼 aria-label(`"<ts>_<파일> 제거"`) 또는 칩 리프 텍스트(`"<ts>_<파일>"`)에서 — `^\d+_` 타임스탬프 접두사 제거
+   - 반환: { count, names: [파일명] }
 
 5. send.js를 `__EXPECTED_ATTACHMENTS__` = 파일 수로 실행. 아래 "send.js 실행" 참조.
 
@@ -75,8 +74,8 @@ send.js를 `__EXPECTED_ATTACHMENTS__` = 0으로 실행. 아래 "send.js 실행" 
 - { sent: false, error: 'STILL_STREAMING' } → 응답 대기 후 재시도
 - { sent: false, error: 'CLEANUP_FAILED' } → send.js 재시도
 - { sent: false, error: 'MISSING_ATTACHMENTS' } → 파일 다시 붙여넣기 후 재시도
-- { sent: false, error: 'SEND_BTN_NOT_FOUND' } → UI 변경, DOM 탐색
-- { error: 'INPUT_NOT_FOUND' } → UI 변경, DOM 탐색
+- { sent: false, error: 'SEND_BTN_NOT_FOUND' } → L2 정규식 폴백도 실패; "고장 대응" 절 참조 (반환된 `buttons` 목록이 진단 자료)
+- { error: 'INPUT_NOT_FOUND' } → L2 폴백도 실패; "고장 대응" 절 참조
 
 ### 전송 확인 — 건강 체크 (단일 async evaluate_script)
 
@@ -239,27 +238,39 @@ After your review, end your response with exactly one of:
 
 ---
 
-## 셀렉터 변경 대응
+## 견고성 & 셀렉터 해석
 
-셀렉터가 작동하지 않으면 `evaluate_script`로 DOM을 탐색하여 새 셀렉터를 찾는다. 이전 셀렉터는 fallback으로 유지하고, Verified Selectors 테이블에 기록.
+스크립트는 UI 요소를 **L1(정확 aria-label) → L2(양국어 정규식)** 순으로 해석한다. 단일 하드코딩 문자열을 쓰지 않는다. 이로써 라벨 변경, 동적 접미사(예: `"<ts>_<파일>.png 제거"`), EN/KR 언어를 코드 수정 없이 흡수한다. 우선순위: 안정 앵커(`data-testid`, ARIA role/heading, live-region status) > aria-label/텍스트 정규식 > 구조적 위치. 빌드 생성 CSS 클래스는 단독 의존 금지(`.font-claude-response`는 *우선* 경로일 뿐 폴백 있음).
 
-## 검증된 셀렉터 & 방법
+스크립트가 쓰는 정규식 (한 패턴이 두 언어 모두 커버):
+- Stop 버튼: `/(중단|중지|stop\s*response)/i`
+- 전송 버튼: `/(보내기|전송|send\s*message)/i`
+- 파일 삭제: `/(제거|삭제|remove|delete)\s*$/i` — 접미사 매칭, `"제거"`와 `"<ts>_<파일> 제거"` 모두 매칭
 
-| 구성 요소 | 셀렉터 / 값 | 언어 | 검증일 | 비고 |
-|-----------|------------|------|--------|------|
-| Stop 버튼 | `"Stop response"` | EN | 2026-03-25 | Primary |
-| Stop 버튼 | `"응답 중단"` | KO | 2026-03-25 | Primary |
-| Stop 버튼 | `"Stop Response"`, `"응답 중지"` | EN/KO | 2026-03-22 | Fallback |
-| 파일 삭제 | `"Remove"` | EN | 2026-03-25 | |
-| 파일 삭제 | `"제거"` | KO | 2026-03-23 | |
-| 전송 버튼 | `"Send Message"` | EN | 2026-03-28 | |
-| 전송 버튼 | `"메시지 보내기"` | KO | 2026-03-28 | |
+**읽기 vs 행동 비대칭**: 추출(읽기)은 구조 점수화(L3)까지 폴백 가능 — 오선택해도 추출 후 맥락 검증에서 잡히므로. 전송·삭제(행동)는 L2에서 멈추고 **추측하지 않고 중단** — 잘못된 행동은 되돌리기 어렵기 때문.
 
-파일 삭제 셀렉터 실패 시 대체 순서:
-1. fieldset 내 모든 버튼 조사 (aria-label, title, SVG)
-2. 파일명 요소의 형제 버튼 탐색
-3. aria-label 변형: "Delete", "삭제", "Close"
-4. 최후 수단: 파일명 옆 SVG-only 버튼
+## 검증된 셀렉터
+
+| 구성 요소 | 해석 방식 | 검증일 | 비고 |
+|-----------|----------|--------|------|
+| Stop 버튼 | 위 정규식; L1 정확 `"응답 중단"`/`"Stop response"` | 2026-06-25 | `[data-is-streaming="true"]`도 사용 |
+| 파일 삭제 | 위 정규식(접미사) | 2026-06-25 | `"<ts>_<파일> 제거"` 동적 라벨 대응 |
+| 전송 버튼 | 위 정규식; L1 정확 `"메시지 보내기"`/`"Send Message"` | 2026-06-25 | 존재+활성화까지 폴링 (React 렌더 레이스) |
+| 응답 본문 | `.font-claude-response`(우선) → 마지막 user-message의 콘텐츠 보유 형제 → 구조(L3) | 2026-06-25 | sr-only "Claude 응답:" 헤딩 없는 깨끗한 텍스트 |
+| 사용자 앵커 | `[data-testid="user-message"]` | 2026-06-25 | 추출 앵커 — 가장 치명적 의존성 |
+
+## 고장 대응 (L2 폴백으로도 안 될 때)
+
+claude.ai의 DOM 구조는 사용 도중 바뀌지 않는다(SPA 번들이 페이지 로드 시점에 고정됨). 진짜 구조 변화는 세션 시작/페이지 (재)로드 시점 — 보통 사용자가 보고 있을 때 표면화된다. 그래서 자율 수정은 불필요하고, 컨펌받은 사람 검토 수정이 더 안전하다.
+
+1. **즉시 스킬 사용 중단** — 고장난 셀렉터로 웹 클로드에 계속 재시도 금지(연쇄 오류·토큰 낭비 방지).
+2. **무엇이 깨졌는지 보고**: 실패한 동작/셀렉터 + DOM에서 관찰된 실제 aria-label/구조 (스크립트는 `SEND_BTN_NOT_FOUND` 시 압축된 `buttons` 목록을 반환; 다른 실패도 동등 정보 수집 — **take_snapshot 금지**).
+3. **수리 경로를 제시·선택받기** (기본값은 작업 무게로 판단):
+   - (a) 이 세션에서 지금 수정
+   - (b) 서브에이전트로 격리 수정 (요약만 반환 → 메인 컨텍스트 오염 최소)
+   - (c) 진단을 temp 디렉토리의 `.md`로 떨구고 새 세션에서 수정
+   - 기본값: 스킬이 계속 필요 → (b)/(a); 메인 작업이 무겁고 스킬 불필요 → (c)
+4. 어떤 수정이든 **사용자 컨펌 후에만** 적용하고, 제안한 셀렉터는 **라이브 DOM에 재검증** — 이전 진단을 맹신하지 말 것(그 사이 또 바뀌었을 수 있음).
 
 ## 트러블슈팅
 
